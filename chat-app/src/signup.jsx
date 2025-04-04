@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { User, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
-import './AuthPage.css';
+import { User, Mail, Lock, ArrowRight, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import './App.css'
+import './Authpage.css'
 
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(true);
@@ -16,11 +17,22 @@ export default function AuthPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [validationErrors, setValidationErrors] = useState({
     password: '',
     confirmPassword: ''
   });
   const navigate = useNavigate();
+
+  // Clear errors when switching between login/signup
+  useEffect(() => {
+    setError('');
+    setValidationErrors({
+      password: '',
+      confirmPassword: ''
+    });
+  }, [isSignUp]);
 
   // Real-time validation
   useEffect(() => {
@@ -38,7 +50,9 @@ export default function AuthPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear error when user starts typing
+    if (error) setError('');
   };
 
   const toggleAuthMode = () => {
@@ -46,11 +60,6 @@ export default function AuthPage() {
     setFormData({
       name: '',
       email: '',
-      password: '',
-      confirmPassword: ''
-    });
-    setError('');
-    setValidationErrors({
       password: '',
       confirmPassword: ''
     });
@@ -72,23 +81,23 @@ export default function AuthPage() {
         }
 
         const { user } = await createUserWithEmailAndPassword(
-          auth, 
-          formData.email, 
+          auth,
+          formData.email,
           formData.password
         );
 
-        // Set display name but leave photoURL empty - user can set it later in profile
+        // Set display name and default avatar
         await updateProfile(user, {
           displayName: formData.name,
-          photoURL: '' // Leave empty initially
+          photoURL: 'https://res.cloudinary.com/dqvnagonh/image/upload/v1620000000/default-avatar.png'
         });
 
-        // Create user document with empty img field
+        // Create user document
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           name: formData.name,
           email: formData.email,
-          img: '', // Empty initially - user can upload later
+          img: 'https://res.cloudinary.com/dqvnagonh/image/upload/v1620000000/default-avatar.png',
           lastMessage: "New user",
           createdAt: serverTimestamp(),
           lastSeen: serverTimestamp(),
@@ -102,12 +111,13 @@ export default function AuthPage() {
           formData.email,
           formData.password
         );
-        
+
+        // Update last seen status
         await setDoc(doc(db, 'users', user.uid), {
           lastSeen: serverTimestamp(),
           status: "online"
         }, { merge: true });
-        
+
         navigate('/dashboard');
       }
     } catch (err) {
@@ -121,17 +131,17 @@ export default function AuthPage() {
   const mapAuthError = (code) => {
     const errors = {
       'auth/email-already-in-use': 'Email is already registered',
-      'auth/invalid-email': 'Invalid email address',
-      'auth/weak-password': 'Password must be 6+ characters',
-      'auth/user-not-found': 'Account not found',
+      'auth/invalid-email': 'Please enter a valid email address',
+      'auth/weak-password': 'Password must be at least 6 characters',
+      'auth/user-not-found': 'No account found with this email',
       'auth/wrong-password': 'Incorrect password',
       'auth/network-request-failed': 'Network error. Please check your connection',
       'auth/too-many-requests': 'Too many attempts. Try again later',
       'auth/user-disabled': 'This account has been disabled',
       'auth/operation-not-allowed': 'Operation not allowed',
-      'auth/invalid-credential': 'Invalid credentials',
+      'auth/invalid-credential': 'Invalid email or password',
     };
-    return errors[code] || 'An unknown error occurred';
+    return errors[code] || 'An error occurred. Please try again.';
   };
 
   const isSubmitDisabled = () => {
@@ -150,8 +160,8 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
+    <div className="auth-container"style={{background: "linear-gradient(to right, rgb(87, 54, 97), white, rgb(192, 53, 134), white)",}}>
+      <div className="auth-card"style={{ background: "linear-gradient(to right, #ff9a9e, #fad0c4, #fad0c4, #ffdde1)",}}>
         <div className="auth-header">
           <h1>{isSignUp ? 'Create Account' : 'Welcome Back'}</h1>
           <p>{isSignUp ? 'Join our community' : 'Sign in to continue'}</p>
@@ -194,10 +204,10 @@ export default function AuthPage() {
             />
           </div>
 
-          <div className="form-group with-icon">
+          <div className="form-group with-icon password-field">
             <Lock className="input-icon" size={18} />
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               name="password"
               placeholder="Password"
               value={formData.password}
@@ -206,16 +216,24 @@ export default function AuthPage() {
               minLength="6"
               aria-label="Password"
             />
+            <button 
+              type="button" 
+              className="toggle-password"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
             {validationErrors.password && (
               <span className="input-error">{validationErrors.password}</span>
             )}
           </div>
 
           {isSignUp && (
-            <div className="form-group with-icon">
+            <div className="form-group with-icon password-field">
               <Lock className="input-icon" size={18} />
               <input
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 placeholder="Confirm Password"
                 value={formData.confirmPassword}
@@ -223,15 +241,23 @@ export default function AuthPage() {
                 required
                 aria-label="Confirm password"
               />
+              <button 
+                type="button" 
+                className="toggle-password"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
               {validationErrors.confirmPassword && (
                 <span className="input-error">{validationErrors.confirmPassword}</span>
               )}
             </div>
           )}
 
-          <button 
-            type="submit" 
-            className="auth-button" 
+          <button
+            type="submit"
+            className="auth-button"
             disabled={isSubmitDisabled()}
             aria-busy={loading}
             aria-live="polite"
@@ -243,7 +269,7 @@ export default function AuthPage() {
               </>
             ) : (
               <>
-                <span>{isSignUp ? 'Register' : 'Login'}</span>
+                <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
                 <ArrowRight className="button-icon" size={18} />
               </>
             )}
@@ -253,13 +279,14 @@ export default function AuthPage() {
         <div className="auth-footer">
           <p>
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="toggle-button"
               onClick={toggleAuthMode}
               aria-label={isSignUp ? 'Switch to sign in' : 'Switch to sign up'}
+              disabled={loading}
             >
-              {isSignUp ? 'Sign In' : 'Create Account'}
+              {isSignUp ? 'Sign In' : 'Sign Up'}
             </button>
           </p>
         </div>
